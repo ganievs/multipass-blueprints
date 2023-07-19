@@ -24,6 +24,8 @@ instances:
       vendor-data: |
         apt:
           sources:
+            helix-ppa:
+              source: ppa:maveonair/helix-editor
             docker:
               source: |
                 deb https://download.docker.com/linux/ubuntu $RELEASE stable
@@ -91,6 +93,25 @@ instances:
                 =0YYh
                 -----END PGP PUBLIC KEY BLOCK-----
 
+        write_files:
+        # expose docker to connect from host machine
+        - path: /etc/systemd/system/docker.service.d/override.conf
+          owner: root:root
+          permissions: '0755'
+          content: |
+            [Service]
+            ExecStart=
+            ExecStart=/usr/bin/dockerd -H fd:// -H tcp://0.0.0.0:1234 --containerd=/run/containerd/containerd.sock
+
+        # setup zsh
+        - path: /home/ubuntu/.zshrc
+          content: |
+            plug "zsh-users/zsh-syntax-highlighting"
+            plug "zap-zsh/zap-prompt"
+            plug "zap-zsh/supercharge"
+            plug "zsh-users/zsh-autosuggestions"
+          append: true
+
         packages:
         - binfmt-support
         - docker-ce
@@ -100,6 +121,8 @@ instances:
         - jq
         - qemu-user-static
         - skopeo
+        - helix
+        - zsh
 
         snap:
           commands:
@@ -109,6 +132,15 @@ instances:
         - |
           # add `ubuntu` to the `docker` group
           adduser ubuntu docker
+
+        - |
+          # chande default shell for ubuntu user
+          usermod -s /bin/zsh username
+
+        - |
+          # install zsh plugin manager and plugins
+          zsh <(curl -s https://raw.githubusercontent.com/zap-zsh/zap/master/install.zsh) --branch release-v1
+          zap update all
 
         - |
           # disable swap
@@ -125,18 +157,6 @@ instances:
           systemctl disable motd-news.service motd-news.timer --now
           systemctl disable bluetooth.target --now
           systemctl disable ua-messaging.service ua-messaging.timer --now
-
-        - |
-          # portainer, to easily manage containers
-          # available on http://<IP>:9000
-          docker run -d \
-            -p 9000:9000 \
-            --name=portainer \
-            --restart=always \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v portainer_data:/data \
-            portainer/portainer-ce
-
         - |
           # apt cleanup
           apt-get autoremove -y
